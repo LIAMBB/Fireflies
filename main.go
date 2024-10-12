@@ -39,18 +39,20 @@ type Client struct {
 
 // Server manages the firefly simulation and WebSocket connections
 type Server struct {
-	clients   map[*Client]bool // Connected clients
-	fireflies [][]*Firefly     // 2D grid of fireflies
-	mutex     sync.RWMutex     // Mutex for thread-safe operations
-	broadcast chan bool        // Channel to signal state updates
+	clients       map[*Client]bool // Connected clients
+	fireflies     [][]*Firefly     // 2D grid of fireflies
+	mutex         sync.RWMutex     // Mutex for thread-safe operations
+	broadcast     chan bool        // Channel to signal state updates
+	lastResetTime time.Time
 }
 
 // newServer creates and initializes a new Server instance
 func newServer() *Server {
 	s := &Server{
-		clients:   make(map[*Client]bool),
-		fireflies: make([][]*Firefly, gridSize),
-		broadcast: make(chan bool),
+		clients:       make(map[*Client]bool),
+		fireflies:     make([][]*Firefly, gridSize),
+		broadcast:     make(chan bool),
+		lastResetTime: time.Now(),
 	}
 	// Initialize the grid with inactive fireflies
 	for i := range s.fireflies {
@@ -176,10 +178,13 @@ func (s *Server) restartSimulation() {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
+	s.lastResetTime = time.Now()
 	// Reset all fireflies to inactive
 	for i := range s.fireflies {
 		for j := range s.fireflies[i] {
 			s.fireflies[i][j] = &Firefly{state: -1, x: i, y: j}
+			s.fireflies[i][j].nextFlashTime = s.lastResetTime
+			s.fireflies[i][j].nextDimTime = s.lastResetTime
 		}
 	}
 
@@ -214,7 +219,7 @@ func (s *Server) broadcastState() {
 			flatState := s.flattenState()
 			s.mutex.RLock()
 			for client := range s.clients {
-				go s.sendState(client, flatState)
+				go s.sendState(client, flatState["grid"].([]int))
 			}
 			s.mutex.RUnlock()
 		}
@@ -224,12 +229,16 @@ func (s *Server) broadcastState() {
 // sendFullState sends the entire grid state to a single client
 func (s *Server) sendFullState(client *Client) {
 	flatState := s.flattenState()
-	s.sendState(client, flatState)
+	s.sendState(client, flatState["grid"].([]int))
 }
 
 // sendState sends the current state to a single client
 func (s *Server) sendState(client *Client, state []int) {
-	err := client.conn.WriteJSON(state)
+	message := map[string]interface{}{
+		"grid":          state,
+		"lastResetTime": s.lastResetTime.UnixNano() / int64(time.Millisecond),
+	}
+	err := client.conn.WriteJSON(message)
 	if err != nil {
 		log.Printf("Error broadcasting to client: %v", err)
 		s.mutex.Lock()
@@ -239,13 +248,16 @@ func (s *Server) sendState(client *Client, state []int) {
 }
 
 // flattenState converts the 2D grid into a 1D array for transmission
-func (s *Server) flattenState() []int {
-	flatState := make([]int, gridSize*gridSize)
+func (s *Server) flattenState() map[string]interface{} {
+	flatState := make(map[string]interface{})
+	grid := make([]int, gridSize*gridSize)
 	for i := 0; i < gridSize; i++ {
 		for j := 0; j < gridSize; j++ {
-			flatState[i*gridSize+j] = s.fireflies[i][j].state
+			grid[i*gridSize+j] = s.fireflies[i][j].state
 		}
 	}
+	flatState["grid"] = grid
+	flatState["lastResetTime"] = s.lastResetTime.UnixNano() / int64(time.Millisecond)
 	return flatState
 }
 

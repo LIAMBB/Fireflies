@@ -59,7 +59,7 @@
                 const timerElement = document.getElementById('timer');
                 let cells;
                 let socket;
-                let lastResetTime = new Date();
+                let serverLastResetTime = new Date();
 
                 function initializeWebSocket() {
                     socket = new WebSocket('wss://firefly-server.liambarter.me:8443/ws');
@@ -87,11 +87,21 @@
                 cells = gridElement.children;
 
                 function updateGrid(state) {
-                    for (let i = 0; i < state.length; i++) {
-                        const cellValue = state[i];
+                    if (!state || !state.grid) {
+                        console.error('Invalid state received:', state);
+                        return;
+                    }
+
+                    const grid = state.grid;
+                    if (state.lastResetTime) {
+                        serverLastResetTime = new Date(state.lastResetTime);
+                    }
+                    
+                    for (let i = 0; i < grid.length; i++) {
+                        const cellValue = grid[i];
                         let color;
                         if (cellValue === -1) {
-                            color = 'transparent'; // Changed to transparent
+                            color = 'transparent';
                         } else if (cellValue === 1) {
                             color = '#90EE90'; // Light green
                         } else {
@@ -103,23 +113,23 @@
                     }
                 }
 
-                function restartSimulation() {
-                    if (socket && socket.readyState === WebSocket.OPEN) {
-                        socket.send('restart');
-                        lastResetTime = new Date();
-                    }
-                }
-
-                restartButton.addEventListener('click', restartSimulation);
-
                 function updateTimer() {
                     const now = new Date();
-                    const diff = now - lastResetTime;
+                    const diff = now - serverLastResetTime;
                     const hours = Math.floor(diff / 3600000);
                     const minutes = Math.floor((diff % 3600000) / 60000);
                     const seconds = Math.floor((diff % 60000) / 1000);
                     timerElement.textContent = `Time since last reset: ${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
                 }
+
+                function restartSimulation() {
+                    if (socket && socket.readyState === WebSocket.OPEN) {
+                        socket.send('restart');
+                        // The server will send the new reset time, so we don't need to update it here
+                    }
+                }
+
+                restartButton.addEventListener('click', restartSimulation);
 
                 setInterval(updateTimer, 1000);
 

@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FireFly Simulator Component</title>
+</head>
+<body>
+    <!-- FireFly Simulator Component -->
+    <div id="firefly-simulator">
+        <style>
+            #firefly-simulator {
+                width: 100%;
+                aspect-ratio: 1 / 1;
+                max-width: 600px; /* You can adjust this value as needed */
+                margin: 0 auto;
+            }
+            #firefly-grid {
+                display: grid;
+                grid-template-columns: repeat(30, 1fr);
+                gap: 1px;
+                border: none; /* Removed border */
+                background-color: transparent; /* Changed to transparent */
+                padding: 1px;
+                width: 100%;
+                height: 100%;
+            }
+            .firefly-cell {
+                aspect-ratio: 1 / 1;
+                border-radius: 50%;
+                transition: background-color 0.2s ease;
+            }
+            #control-panel {
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                margin-top: 10px;
+            }
+            #restart-button {
+                padding: 10px 20px;
+                font-size: 16px;
+                cursor: pointer;
+            }
+            #timer {
+                margin-left: 20px;
+                font-size: 16px;
+            }
+        </style>
+        <div id="firefly-grid"></div>
+        <div id="control-panel">
+            <button id="restart-button">Restart Simulation</button>
+            <div id="timer">Time since last reset: 00:00:00</div>
+        </div>
+        <script>
+            (function() {
+                const gridElement = document.getElementById('firefly-grid');
+                const restartButton = document.getElementById('restart-button');
+                const timerElement = document.getElementById('timer');
+                let cells;
+                let socket;
+                let lastResetTime = new Date();
+
+                function initializeWebSocket() {
+                    socket = new WebSocket('ws://34.67.30.211:8080/ws');
+
+                    socket.onmessage = function(event) {
+                        const state = JSON.parse(event.data);
+                        updateGrid(state);
+                    };
+
+                    socket.onerror = function(error) {
+                        console.error('FireFly Simulator WebSocket Error:', error);
+                    };
+
+                    socket.onclose = function(event) {
+                        console.log('FireFly Simulator WebSocket connection closed:', event);
+                    };
+                }
+
+                // Create grid cells
+                for (let i = 0; i < 30 * 30; i++) {
+                    const cell = document.createElement('div');
+                    cell.className = 'firefly-cell';
+                    gridElement.appendChild(cell);
+                }
+                cells = gridElement.children;
+
+                function updateGrid(state) {
+                    for (let i = 0; i < state.length; i++) {
+                        const cellValue = state[i];
+                        let color;
+                        if (cellValue === -1) {
+                            color = 'transparent'; // Changed to transparent
+                        } else if (cellValue === 1) {
+                            color = '#90EE90'; // Light green
+                        } else {
+                            color = '#404040'; // Dark grey
+                        }
+                        if (cells[i].style.backgroundColor !== color) {
+                            cells[i].style.backgroundColor = color;
+                        }
+                    }
+                }
+
+                function restartSimulation() {
+                    if (socket && socket.readyState === WebSocket.OPEN) {
+                        socket.send('restart');
+                        lastResetTime = new Date();
+                    }
+                }
+
+                restartButton.addEventListener('click', restartSimulation);
+
+                function updateTimer() {
+                    const now = new Date();
+                    const diff = now - lastResetTime;
+                    const hours = Math.floor(diff / 3600000);
+                    const minutes = Math.floor((diff % 3600000) / 60000);
+                    const seconds = Math.floor((diff % 60000) / 1000);
+                    timerElement.textContent = `Time since last reset: ${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+                }
+
+                setInterval(updateTimer, 1000);
+
+                // Auto-reset every hour
+                setInterval(restartSimulation, 3600000);
+
+                // Resize observer to maintain square aspect ratio
+                const resizeObserver = new ResizeObserver(entries => {
+                    for (let entry of entries) {
+                        const width = entry.contentRect.width;
+                        entry.target.style.height = `${width}px`;
+                    }
+                });
+
+                resizeObserver.observe(document.getElementById('firefly-simulator'));
+
+                initializeWebSocket();
+            })();
+        </script>
+    </div>
+    <!-- End of FireFly Simulator Component -->
+</body>
+</html>

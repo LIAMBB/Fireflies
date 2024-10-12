@@ -261,9 +261,9 @@ func main() {
 
 	go server.broadcastState() // Start broadcasting goroutine
 
-	// Use TLS
-	fmt.Println("Server starting on :8443 (WSS)")
-	err := http.ListenAndServeTLS(":8443", "cert.pem", "key.pem", nil)
+	// Use TLS with domain-based certificate
+	fmt.Println("Server starting on :443 (WSS)")
+	err := http.ListenAndServeTLS(":8443", "/etc/letsencrypt/live/firefly-server.liambarter.me/fullchain.pem", "/etc/letsencrypt/live/firefly-server.liambarter.me/privkey.pem", nil)
 	if err != nil {
 		log.Fatal("ListenAndServeTLS: ", err)
 	}

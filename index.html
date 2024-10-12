@@ -52,6 +52,7 @@
             <div id="timer">Time since last reset: 00:00:00</div>
         </div>
         <script>
+            const socket = new WebSocket('wss://' + window.location.hostname + '/ws');
             (function() {
                 const gridElement = document.getElementById('firefly-grid');
                 const restartButton = document.getElementById('restart-button');
@@ -61,7 +62,7 @@
                 let lastResetTime = new Date();
 
                 function initializeWebSocket() {
-                    socket = new WebSocket('ws://34.67.30.211:8080/ws');
+                    socket = new WebSocket('wss://firefly-server.liambarter.me:8443/ws');
 
                     socket.onmessage = function(event) {
                         const state = JSON.parse(event.data);

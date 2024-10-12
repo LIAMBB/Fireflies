@@ -73,3 +73,25 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 - Inspired by the synchronization behavior of real fireflies
 - Thanks to the Go community for the excellent WebSocket library
+
+## SSL Configuration for Domain Name
+
+This application requires SSL certificates for secure WebSocket connections. 
+To obtain free SSL certificates using Let's Encrypt:
+
+1. Install Certbot: https://certbot.eff.org/
+   Choose your server software (None of the above) and system to get specific instructions.
+
+2. Run Certbot to obtain certificates:   ```
+   sudo certbot certonly --standalone -d yourdomain.com   ```
+
+3. Update the `main.go` file with the paths to your new certificate files:   ```go
+   err := http.ListenAndServeTLS(":443", "/etc/letsencrypt/live/yourdomain.com/fullchain.pem", "/etc/letsencrypt/live/yourdomain.com/privkey.pem", nil)   ```
+
+4. Set up auto-renewal for your certificates:   ```
+   sudo certbot renew --dry-run   ```
+   If the dry run is successful, add a cron job to renew the certificate automatically.
+
+5. Restart the application after obtaining new certificates.
+
+Remember to replace 'yourdomain.com' with your actual domain name.
